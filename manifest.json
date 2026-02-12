@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Unicode Search & Copy",
+  "version": "1.0",
+  "description": "Easily search and copy unicode symbols.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Unicode Search"
+  },
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page_helper.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

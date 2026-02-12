@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unicode Search</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="unicode">Unicode Search</button>
+      <button class="tab-btn" data-tab="table">Table Helper</button>
+    </div>
+
+    <!-- Unicode Search Tab -->
+    <div id="unicode-tab" class="tab-content active">
+      <div class="search-container">
+        <input type="text" id="search-input" placeholder="Search symbols..." autofocus>
+        <div class="settings-container">
+          <label class="toggle-switch">
+            <input type="checkbox" id="latex-toggle">
+            <span class="slider"></span>
+          </label>
+          <span class="setting-label">Enable LaTeX Toolbar</span>
+        </div>
+      </div>
+      <div id="results-container" class="results-grid">
+        <!-- Symbols will be injected here -->
+      </div>
+    </div>
+
+    <!-- Table Helper Tab -->
+    <div id="table-tab" class="tab-content">
+      <div class="table-helper-container">
+        <div class="settings-container" style="margin-bottom: 12px;">
+          <label class="toggle-switch">
+            <input type="checkbox" id="table-helper-toggle">
+            <span class="slider"></span>
+          </label>
+          <span class="setting-label">Enable auto-fill Button</span>
+        </div>
+
+        <div class="helper-row">
+          <span class="helper-label">Row:</span>
+          <div class="helper-controls">
+            <button class="helper-btn" id="row-dec">−</button>
+            <span class="helper-value" id="row-value">0</span>
+            <button class="helper-btn" id="row-inc">+</button>
+          </div>
+        </div>
+
+        <div class="helper-row">
+          <span class="helper-label">Column:</span>
+          <div class="helper-controls">
+            <button class="helper-btn" id="col-dec">−</button>
+            <span class="helper-value" id="col-value">0</span>
+            <button class="helper-btn" id="col-inc">+</button>
+          </div>
+        </div>
+
+        <div class="helper-row">
+          <span class="helper-label">Total Cols:</span>
+          <input type="number" class="helper-input" id="total-cols" value="3" min="1" max="50">
+        </div>
+
+        <div class="helper-row">
+          <span class="helper-label">Span (x, y):</span>
+          <input type="number" class="helper-input span-input" id="xspan" value="1" min="1" max="20">
+          <input type="number" class="helper-input span-input" id="yspan" value="1" min="1" max="20">
+        </div>
+
+        <button class="action-btn primary" id="fill-btn">Fill & Next</button>
+        <button class="action-btn secondary" id="reset-btn">Reset Position</button>
+
+        <div class="hotkey-hint">
+          <kbd>Enter</kbd> Fill & Next | <kbd>Shift+Enter</kbd> Fill Only
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden">Copied to clipboard!</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
