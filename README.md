@@ -9,6 +9,7 @@
 ## Features
 
 - Toggle "Enable LaTeX Toolbar" to quickly Bold or italicize text. Simply highlight the text you want to apply LaTeX to.
+  ![hippo](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZm4wbm16cmxnem9kOGhpeGs3YXkwemZ6aWFiODhwY291aG1qODBtNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dZFqYvKRrA6OTNBItE/giphy.gif)
 - Unicode Search: all supported Unicode are available, click to copy to your clipboard;
 - Table indexing Speeds up indexing simple tables with no spanning.
   - Enter the number of columns in the table
