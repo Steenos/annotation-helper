@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Unicode Search & Copy",
-  "version": "1.0",
-  "description": "Easily search and copy unicode symbols.",
+  "name": "Annotation Helper",
+  "version": "1.01",
+  "description": "Easily search and copy unicode symbols, quickly add LaTeX, assists iwith indexing tables",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Unicode Search"
+    "default_title": "Annotation Helper"
   },
   "permissions": [
     "activeTab",
