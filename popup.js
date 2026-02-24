@@ -296,6 +296,19 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ tableHelperEnabled: e.target.checked });
   });
 
+  // CharSize Toggle Handler
+  const charsizeToggle = document.getElementById('charsize-toggle');
+  
+  chrome.storage.local.get(['charsizeEnabled'], (result) => {
+    if (charsizeToggle) charsizeToggle.checked = result.charsizeEnabled === true;
+  });
+
+  if (charsizeToggle) {
+    charsizeToggle.addEventListener('change', (e) => {
+      chrome.storage.local.set({ charsizeEnabled: e.target.checked });
+    });
+  }
+
   // Load saved state from chrome.storage.local
   chrome.storage.local.get(['table_helper_state'], (result) => {
     if (result.table_helper_state) {

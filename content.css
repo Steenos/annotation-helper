@@ -67,3 +67,18 @@
 .tah-feedback.fade-out {
   opacity: 0;
 }
+
+/* CharSize Overlays */
+.tah-charsize-label {
+  position: absolute;
+  color: white;
+  padding: 2px 5px;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: monospace;
+  border-radius: 3px;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  transition: top 0.1s, left 0.1s;
+}

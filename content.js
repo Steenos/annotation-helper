@@ -407,3 +407,153 @@ function watchForAnnotoriousPopup() {
 }
 
 watchForAnnotoriousPopup();
+
+// ============================================
+// Table Annotation Helper - CharSize Viewer
+// ============================================
+
+let isCharsizeEnabled = false;
+let charsizeData = null;
+let charsizeInterval = null;
+
+chrome.storage.local.get(['charsizeEnabled'], (result) => {
+  isCharsizeEnabled = result.charsizeEnabled === true;
+  updateCharsizeViewer();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.charsizeEnabled !== undefined) {
+    isCharsizeEnabled = changes.charsizeEnabled.newValue;
+    updateCharsizeViewer();
+  }
+});
+
+function updateCharsizeViewer() {
+  if (isCharsizeEnabled) {
+    injectPageHelper();
+    document.dispatchEvent(new CustomEvent('tah-fetch-annotations'));
+  } else {
+    clearCharsizeLabels();
+    if (charsizeInterval) {
+      clearInterval(charsizeInterval);
+      charsizeInterval = null;
+    }
+  }
+}
+
+document.addEventListener('tah-annotations-data', (e) => {
+  if (!isCharsizeEnabled) return;
+  const jsonStr = e.detail;
+  if (!jsonStr) {
+    showTahFeedback('Failed to read charSize data. Please make sure the JSON format is correct.');
+    return;
+  }
+  
+  try {
+    const data = JSON.parse(jsonStr);
+    const annoList = data.anno_list || [];
+    
+    charsizeData = new Map();
+    if (Array.isArray(annoList)) {
+      annoList.forEach(ann => {
+        if (ann.id && ann.shapes && ann.shapes.length > 0) {
+          let cleanIdStr = String(ann.id).replace(/^#/, '');
+          let size = ann.charSize !== undefined ? ann.charSize : ann.char_size;
+          if (size !== undefined) {
+             // Round to 2 decimal places for cleaner display
+             charsizeData.set(cleanIdStr, {
+               size: Number(size).toFixed(2),
+               geom: ann.shapes[0].geometry 
+             });
+          }
+        }
+      });
+    }
+    
+    if (charsizeInterval) clearInterval(charsizeInterval);
+    drawCharsizeLabels();
+    charsizeInterval = setInterval(drawCharsizeLabels, 200);
+    
+    showTahFeedback(`Found ${charsizeData.size} charSize values`);
+  } catch(err) {
+    console.error('TAH: JSON parse error for charSize data', err);
+    showTahFeedback('Error parsing annotation JSON');
+  }
+});
+
+function clearCharsizeLabels() {
+  document.querySelectorAll('.tah-charsize-label').forEach(el => el.remove());
+}
+
+function drawCharsizeLabels() {
+  if (!isCharsizeEnabled || !charsizeData) return;
+  
+  // Annotorious usually wraps the image in a container with class .a9s-annotationlayer or similar.
+  // We'll look for the main SVG or the image itself to get the bounding box.
+  const svgLayer = document.querySelector('.a9s-annotationlayer') || document.querySelector('svg.a9s-annotationlayer');
+  const imgElement = svgLayer ? svgLayer.previousElementSibling : document.querySelector('img.annotatable');
+  
+  const container = svgLayer || imgElement;
+  
+  if (!container) {
+    // If we can't find the image/svg container, hide all labels
+    document.querySelectorAll('.tah-charsize-label').forEach(label => label.style.display = 'none');
+    return;
+  }
+  
+  const rect = container.getBoundingClientRect();
+  const processedIds = new Set();
+  
+  charsizeData.forEach((data, id) => {
+    const { size, geom } = data;
+    if (!geom) return;
+    
+    let geomX = geom.x;
+    let geomY = geom.y;
+    
+    // Handle polygon types which might store coordinates in a points array
+    if (geomX === undefined || geomY === undefined) {
+      if (geom.points && Array.isArray(geom.points) && geom.points.length > 0) {
+        if (Array.isArray(geom.points[0])) {
+           geomX = Math.min(...geom.points.map(p => p[0]));
+           geomY = Math.min(...geom.points.map(p => p[1]));
+        } else if (geom.points[0].x !== undefined) {
+           geomX = Math.min(...geom.points.map(p => p.x));
+           geomY = Math.min(...geom.points.map(p => p.y));
+        }
+      }
+    }
+    
+    if (geomX === undefined || geomY === undefined) return;
+    
+    processedIds.add(id);
+    
+    let label = document.getElementById('charsize-label-' + id);
+    if (!label) {
+      label = document.createElement('div');
+      label.id = 'charsize-label-' + id;
+      label.className = 'tah-charsize-label';
+      label.textContent = size;
+      document.body.appendChild(label);
+    }
+    
+    label.style.display = 'block';
+    
+    // geomX and geomY are relative fractions of the image width/height
+    const absoluteX = rect.left + window.scrollX + (geomX * rect.width);
+    const absoluteY = rect.top + window.scrollY + (geomY * rect.height);
+    
+    label.style.left = absoluteX + 'px';
+    label.style.top = (absoluteY - 18) + 'px';
+    
+    const hue = (size * 35) % 360; 
+    label.style.backgroundColor = `hsl(${hue}, 70%, 40%)`;
+  });
+  
+  document.querySelectorAll('.tah-charsize-label').forEach(label => {
+    const id = label.id.replace('charsize-label-', '');
+    if (!processedIds.has(id)) {
+      label.remove();
+    }
+  });
+}
