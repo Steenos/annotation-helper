@@ -141,90 +141,87 @@ injectPageHelper();
 
 // Input field selectors (from the annotorious popup)
 const SELECTORS = {
-  popup: '.annotorious-popup',
-  rowInput: 'input.annotorious-popup-input-row-idx',
-  colInput: 'input.annotorious-popup-input-col-idx',
-  increaseRowSpan: 'a.annotorious-popup-button.annotorious-popup-button-increase-row-span',
-  increaseColSpan: 'a.annotorious-popup-button.annotorious-popup-button-increase-col-span'
+  popup: 'div[data-annotation-popup="true"]'
 };
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'fillTableAnnotation') {
-    const result = fillAnnotationFields(message.data);
-    sendResponse(result);
+    fillAnnotationFields(message.data).then(result => sendResponse(result));
+    return true; // keep channel open for async response
   }
   return true;
 });
 
+// Delegate field filling to the page context (page_helper.js) so that
+// the website's framework properly picks up the value changes.
 function fillAnnotationFields(data) {
-  const { row, col, xspan, yspan } = data;
+  injectPageHelper();
   
+  return new Promise((resolve) => {
+    function onResult(e) {
+      document.removeEventListener('tah-fill-result', onResult);
+      let result;
+      try {
+        result = typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail;
+      } catch (err) {
+        result = { success: false, error: 'Failed to parse fill result' };
+      }
+      resolve(result);
+    }
+    document.addEventListener('tah-fill-result', onResult);
+    
+    // JSON-stringify data to ensure it passes across Chrome's isolated worlds
+    document.dispatchEvent(new CustomEvent('tah-fill-fields', {
+      detail: JSON.stringify(data)
+    }));
+    
+    // Timeout fallback
+    setTimeout(() => {
+      document.removeEventListener('tah-fill-result', onResult);
+      resolve({ success: false, error: 'Page helper did not respond' });
+    }, 2000);
+  });
+}
+
+// ============================================
+// Table Annotation Helper - Inline auto-fill Button
+// ============================================
+
+function findCellMetadataHeader(popup) {
+  // Find the "Cell Metadata" label div inside the popup
+  const divs = popup.querySelectorAll('div');
+  for (const div of divs) {
+    if (div.childNodes.length === 1 && div.textContent.trim() === 'Cell Metadata') {
+      return div;
+    }
+  }
+  return null;
+}
+
+function injectTahButton() {
   const popup = document.querySelector(SELECTORS.popup);
+  if (!popup) return;
   
-  if (!popup) {
-    return { success: false, error: 'No annotation popup found' };
+  // Don't inject twice
+  if (popup.querySelector('[data-tah-button]')) {
+    tahNextButton = popup.querySelector('[data-tah-button]');
+    return;
   }
   
-  const rowInput = popup.querySelector(SELECTORS.rowInput);
-  const colInput = popup.querySelector(SELECTORS.colInput);
-
-  if (!rowInput || !colInput) {
-    return { success: false, error: 'Input fields not found' };
-  }
-
-  setInputValue(rowInput, row);
-  setInputValue(colInput, col);
+  const header = findCellMetadataHeader(popup);
+  if (!header) return;
   
-  const rowSpanBtnSelector = SELECTORS.popup + ' ' + SELECTORS.increaseRowSpan;
-  const colSpanBtnSelector = SELECTORS.popup + ' ' + SELECTORS.increaseColSpan;
-  
-  for (let i = 0; i < yspan; i++) {
-    clickButtonInPageContext(rowSpanBtnSelector);
-  }
-  
-  for (let i = 0; i < xspan; i++) {
-    clickButtonInPageContext(colSpanBtnSelector);
-  }
-
-  return { success: true };
-}
-
-function setInputValue(input, value) {
-  if (!input) return;
-  
-  const strValue = String(value);
-  input.value = strValue;
-  
-  try {
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-    nativeInputValueSetter.call(input, strValue);
-  } catch (e) {}
-  
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function clickButtonInPageContext(selector) {
-  document.dispatchEvent(new CustomEvent('tah-click-button', {
-    detail: { selector: selector }
-  }));
-}
-
-// ============================================
-// Table Annotation Helper - Floating auto-fill Button
-// ============================================
-
-function createTahNextButton() {
-  if (tahNextButton) return tahNextButton;
-  
-  const toolbar = document.createElement('div');
-  toolbar.className = 'unicode-latex-toolbar tah-toolbar';
-  toolbar.style.position = 'fixed';
-  toolbar.setAttribute('data-tah-button', 'true');
+  // Make the header's parent a flex row so the button sits inline
+  header.style.display = 'inline';
   
   const btn = document.createElement('button');
+  btn.setAttribute('data-tah-button', 'true');
   btn.textContent = 'auto-fill';
-  btn.title = 'Fill & advance to next cell';
+  btn.title = 'Fill cell metadata & advance to next cell';
+  btn.style.cssText = 'border: 1px solid #4a90d9; background: #4a90d9; color: white; ' +
+    'border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 6px; ' +
+    'line-height: 16px; margin-left: 6px; font-weight: bold; vertical-align: middle;';
   
   btn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -232,12 +229,12 @@ function createTahNextButton() {
     triggerFillAndNext();
   });
   
-  toolbar.appendChild(btn);
+  // Insert button right after the header text
+  header.parentElement.insertBefore(btn, header.nextSibling);
+  
   tahMutating = true;
-  document.body.appendChild(toolbar);
-  tahNextButton = toolbar;
+  tahNextButton = btn;
   setTimeout(() => { tahMutating = false; }, 0);
-  return toolbar;
 }
 
 function removeTahNextButton() {
@@ -250,43 +247,11 @@ function removeTahNextButton() {
 }
 
 function positionTahNextButton() {
-  const toolbar = createTahNextButton();
-  
-  let top, left;
-  
-  // Position to the left of the annotorious popup toolbar
-  const popup = document.querySelector(SELECTORS.popup);
-  if (popup) {
-    const rect = popup.getBoundingClientRect();
-    const toolbarWidth = toolbar.offsetWidth || 70; // estimate if not yet rendered
-    top = rect.top;
-    left = rect.left - toolbarWidth - 6; // 6px gap
-    
-    // If not enough room on the left, try right side
-    if (left < 5) {
-      left = rect.right + 6;
-    }
-  } else {
-    // Fallback to click position if popup not found
-    top = lastClickPosition.y - 15;
-    left = lastClickPosition.x - 80;
-  }
-  
-  // Boundary checks
-  if (top < 5) top = 5;
-  if (left < 5) left = 5;
-  if (left > window.innerWidth - 80) left = window.innerWidth - 80;
-  
-  toolbar.style.top = top + 'px';
-  toolbar.style.left = left + 'px';
+  injectTahButton();
 }
 
 function triggerFillAndNext() {
-  chrome.runtime.sendMessage({ action: 'triggerFillAndNext' }, (response) => {
-    if (chrome.runtime.lastError) {
-      directFillAndNext();
-    }
-  });
+  directFillAndNext();
 }
 
 async function directFillAndNext() {
@@ -306,14 +271,14 @@ async function directFillAndNext() {
     tableState = { ...tableState, ...result.table_helper_state };
   }
   
-  const fillResult = fillAnnotationFields({
+  const fillResult = await fillAnnotationFields({
     row: tableState.currentRow,
     col: tableState.currentCol,
     xspan: tableState.xspan,
     yspan: tableState.yspan
   });
   
-  if (fillResult.success) {
+  if (fillResult && fillResult.success) {
     tableState.currentCol++;
     if (tableState.currentCol >= tableState.totalCols) {
       tableState.currentCol = 0;
