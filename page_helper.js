@@ -22,9 +22,12 @@
 
   // Fetch Annotations
   document.addEventListener('tah-fetch-annotations', function() {
-    // Find the button by text content to be robust to DOM changes
-    const buttons = Array.from(document.querySelectorAll('button'));
-    const btn = buttons.find(b => b.textContent && b.textContent.includes('Copy Anno JSON'));
+    // Find the copy button - try title attribute first (new UI), then text content (old UI)
+    let btn = document.querySelector('button[title="Copy annotation JSON"]');
+    if (!btn) {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      btn = buttons.find(b => b.textContent && b.textContent.includes('Copy Anno JSON'));
+    }
     
     if (!btn) {
       console.log('TAH: Copy Anno JSON button not found');

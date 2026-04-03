@@ -453,20 +453,35 @@ function clearCharsizeLabels() {
 function drawCharsizeLabels() {
   if (!isCharsizeEnabled || !charsizeData) return;
   
-  // Annotorious usually wraps the image in a container with class .a9s-annotationlayer or similar.
-  // We'll look for the main SVG or the image itself to get the bounding box.
-  const svgLayer = document.querySelector('.a9s-annotationlayer') || document.querySelector('svg.a9s-annotationlayer');
-  const imgElement = svgLayer ? svgLayer.previousElementSibling : document.querySelector('img.annotatable');
-  
-  const container = svgLayer || imgElement;
+  // Try multiple selectors to find the annotation layer / image container.
+  // Konva.js (new UI) first, then Annotorious / OpenSeadragon fallbacks.
+  const container =
+    document.querySelector('.konvajs-content') ||
+    document.querySelector('.a9s-annotationlayer') ||
+    document.querySelector('.a9s-osd-layer') ||
+    document.querySelector('.openseadragon-canvas') ||
+    document.querySelector('svg.a9s-annotationlayer') ||
+    document.querySelector('img.annotatable') ||
+    document.querySelector('.a9s-outer');
   
   if (!container) {
-    // If we can't find the image/svg container, hide all labels
     document.querySelectorAll('.tah-charsize-label').forEach(label => label.style.display = 'none');
     return;
   }
   
   const rect = container.getBoundingClientRect();
+  
+  // Determine the native (internal) resolution of the canvas for coordinate scaling.
+  // Konva canvases may have a higher internal resolution than their CSS display size
+  // (e.g. canvas width=1800 displayed at 1200px due to devicePixelRatio).
+  let nativeWidth = rect.width;
+  let nativeHeight = rect.height;
+  const canvas = container.querySelector('canvas');
+  if (canvas) {
+    nativeWidth = canvas.width;
+    nativeHeight = canvas.height;
+  }
+  
   const processedIds = new Set();
   
   charsizeData.forEach((data, id) => {
@@ -504,9 +519,19 @@ function drawCharsizeLabels() {
     
     label.style.display = 'block';
     
-    // geomX and geomY are relative fractions of the image width/height
-    const absoluteX = rect.left + window.scrollX + (geomX * rect.width);
-    const absoluteY = rect.top + window.scrollY + (geomY * rect.height);
+    // Determine coordinate type and compute absolute position.
+    // Fractional coords (old Annotorious): both x,y in 0-1 range → multiply by display size.
+    // Absolute pixel coords (Konva): values > 1 → scale from native canvas resolution to display size.
+    let absoluteX, absoluteY;
+    if (geomX <= 1 && geomY <= 1) {
+      // Fractional coordinates (Annotorious-style)
+      absoluteX = rect.left + window.scrollX + (geomX * rect.width);
+      absoluteY = rect.top + window.scrollY + (geomY * rect.height);
+    } else {
+      // Absolute pixel coordinates – scale from canvas native resolution to display size
+      absoluteX = rect.left + window.scrollX + (geomX / nativeWidth * rect.width);
+      absoluteY = rect.top + window.scrollY + (geomY / nativeHeight * rect.height);
+    }
     
     label.style.left = absoluteX + 'px';
     label.style.top = (absoluteY - 18) + 'px';
