@@ -12,6 +12,8 @@
     <div class="tab-nav">
       <button class="tab-btn active" data-tab="unicode">Unicode Search</button>
       <button class="tab-btn" data-tab="table">Table Helper</button>
+       <button class="tab-btn" data-tab="charsize">Charsize Viewer</button>
+    </div>
     </div>
 
     <!-- Unicode Search Tab -->
@@ -87,7 +89,14 @@
         </div>
       </div>
     </div>
-
+    <!-- Charsize Viewer Tab -->
+    <div id="charsize-tab" class="tab-content">
+      <div class="charsize-container">
+        <button class="action-btn primary" id="charsize-fetch-btn">Load from page</button>
+        <div id="charsize-result" class="charsize-result"></div>
+      </div>
+    </div>
+    
     <div id="toast" class="toast hidden">Copied to clipboard!</div>
   </div>
   <script src="popup.js"></script>

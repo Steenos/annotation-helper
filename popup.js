@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const charsizeFetchBtn = document.getElementById('charsize-fetch-btn');
+  const charsizeResult = document.getElementById('charsize-result');
   const searchInput = document.getElementById('search-input');
   const resultsContainer = document.getElementById('results-container');
   const toast = document.getElementById('toast');
@@ -35,13 +37,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // new Charsize Viewer
+  charsizeFetchBtn?.addEventListener('click', async () => {
+  try {
+    charsizeResult.innerHTML = '<span>Loading...</span>';
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      action: 'getAnnotationJson'
+    });
+
+    if (!response || !response.success || !response.data) {
+      charsizeResult.innerHTML = '<span class="result-error">Failed to load anno JSON</span>';
+      return;
+    }
+
+    const ranges = buildRanges(response.data);
+    const textIssueOrders = findTextIssueOrders(response.data);
+    const resultText = formatCharsizeOutput(ranges, textIssueOrders);
+
+    renderCharsizeResult(resultText);
+  } catch (error) {
+    console.error('Charsize Viewer error:', error);
+    charsizeResult.innerHTML = '<span class="result-error">No annotation data found</span>';
+  }
+  });
+
   // Restore active tab
   const savedTab = localStorage.getItem('unicode_active_tab');
   if (savedTab) {
     const savedBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
     if (savedBtn) savedBtn.click();
   }
-
   // ============================================
   // Unicode Search Tab
   // ============================================
@@ -272,7 +300,184 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.classList.add('hidden');
     }, 2000);
   }
+//Char size logic
 
+function maskMathBlocks(text) {
+  if (!text) return "";
+
+  const patterns = [
+    /\\\(([\s\S]*?)\\\)/g,
+    /\\\[([\s\S]*?)\\\]/g,
+    /\$\$([\s\S]*?)\$\$/g,
+    /(?<!\$)\$([\s\S]*?)(?<!\$)\$(?!\$)/g
+  ];
+
+  let masked = text;
+
+  for (const pattern of patterns) {
+    masked = masked.replace(pattern, (match) => "M".repeat(match.length));
+  }
+
+  return masked;
+}
+
+function hasTextIssues(text) {
+  if (!text) return false;
+
+  const masked = maskMathBlocks(text);
+  const hasDoubleSpace = / {2,}/.test(masked);
+  const hasExtraEnter = masked.includes("\n");
+  const hasTrailingSpace = masked.endsWith(" ");
+
+  return hasDoubleSpace || hasExtraEnter || hasTrailingSpace;
+}
+
+function findTextIssueOrders(data) {
+  const badOrders = [];
+
+  const annoList = (data.anno_list || [])
+    .filter(box => box.order !== null && box.order !== undefined)
+    .sort((a, b) => a.order - b.order);
+
+  for (const box of annoList) {
+    const text = box.text || "";
+    if (hasTextIssues(text)) {
+      badOrders.push(box.order);
+    }
+  }
+
+  return badOrders;
+}
+
+function roundHalfUpTo2(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+
+  const sign = num < 0 ? -1 : 1;
+  const abs = Math.abs(num);
+  return (sign * Math.floor(abs * 100 + 0.5) / 100).toFixed(2);
+}
+
+function buildRanges(data) {
+  const annoList = (data.anno_list || [])
+    .filter(box => box.order !== null && box.order !== undefined)
+    .sort((a, b) => a.order - b.order);
+
+  const ranges = [];
+  let currentVal = null;
+  let rangeStart = null;
+  let lastOrder = null;
+
+  for (const box of annoList) {
+    const order = box.order;
+    const charSize = box.charSize;
+
+    if (charSize === null || charSize === undefined) continue;
+
+    const rounded = roundHalfUpTo2(charSize);
+    if (rounded === null) continue;
+
+    if (currentVal === null) {
+      currentVal = rounded;
+      rangeStart = order;
+      lastOrder = order;
+      continue;
+    }
+
+    if (rounded === currentVal) {
+      lastOrder = order;
+      continue;
+    }
+
+    ranges.push([rangeStart, lastOrder, currentVal]);
+    currentVal = rounded;
+    rangeStart = order;
+    lastOrder = order;
+  }
+
+  if (currentVal !== null) {
+    ranges.push([rangeStart, lastOrder, currentVal]);
+  }
+
+  return ranges;
+}
+
+function formatCharsizeOutput(ranges, textIssueOrders) {
+  const lines = [];
+
+  if (textIssueOrders.length > 0) {
+    lines.push(`Text issues : ${textIssueOrders.join('; ')}`);
+  } else {
+    lines.push('Text issues : 0');
+  }
+
+  const result = [];
+
+  for (const [start, end, val] of ranges) {
+    const part = start === end ? `${start}` : `${start}-${end}`;
+
+    let found = false;
+    for (const row of result) {
+      if (row[0] === val) {
+        row[1].push(part);
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      result.push([val, [part]]);
+    }
+  }
+
+  for (const [val, parts] of result) {
+    lines.push(`${parts.join('; ')} : ${val}`);
+  }
+
+  return lines.join('\n');
+}
+
+
+function renderCharsizeResult(text) {
+  const container = document.getElementById('charsize-result');
+  container.innerHTML = '';
+
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const row = document.createElement('div');
+
+    if (line.startsWith('Text issues : ')) {
+      const [left, right] = line.split(' : ');
+
+      const leftSpan = document.createElement('span');
+      leftSpan.textContent = `${left} : `;
+
+      const rightSpan = document.createElement('span');
+      rightSpan.textContent = right;
+      rightSpan.className = right === '0' ? 'result-ok' : 'result-issue';
+
+      row.appendChild(leftSpan);
+      row.appendChild(rightSpan);
+    } else if (line.includes(' : ')) {
+      const [left, right] = line.split(' : ');
+
+      const leftSpan = document.createElement('span');
+      leftSpan.textContent = `${left} : `;
+
+      const rightSpan = document.createElement('span');
+      rightSpan.textContent = right;
+      rightSpan.className = 'result-charsize';
+
+      row.appendChild(leftSpan);
+      row.appendChild(rightSpan);
+    } else {
+      row.textContent = line;
+    }
+
+    container.appendChild(row);
+  }
+}
   // ============================================
   // Table Helper Tab
   // ============================================

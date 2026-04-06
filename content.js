@@ -547,3 +547,52 @@ function drawCharsizeLabels() {
     }
   });
 }
+
+// char size viewer new tab
+function getAnnotationJsonFromPage() {
+  return new Promise((resolve, reject) => {
+    let timeoutId;
+
+    function handleData(event) {
+      clearTimeout(timeoutId);
+      document.removeEventListener('tah-annotations-data', handleData);
+
+      try {
+        const raw = event.detail;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+        if (!parsed || !parsed.anno_list) {
+          reject(new Error('Invalid annotation data'));
+          return;
+        }
+
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      }
+    }
+
+    document.addEventListener('tah-annotations-data', handleData, { once: true });
+    document.dispatchEvent(new CustomEvent('tah-fetch-annotations'));
+
+    timeoutId = setTimeout(() => {
+      document.removeEventListener('tah-annotations-data', handleData);
+      reject(new Error('Timed out waiting for annotation data'));
+    }, 3000);
+  });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getAnnotationJson') {
+    getAnnotationJsonFromPage()
+      .then((data) => {
+        sendResponse({ success: true, data });
+      })
+      .catch((error) => {
+        console.error('getAnnotationJson error:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+
+    return true;
+  }
+});

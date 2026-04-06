@@ -1,6 +1,7 @@
 # Annotation Helper
 A Chrome extension for searching/copying Unicode symbols, applying LaTeX formatting, and assisting with table annotation indexing.
 ## Features
+- (NEW) **Charsize Viewer (new tab)** — View the charSize for each line on the page. Thank you Ihor!
 - **Unicode Search** — Browse and search a library of supported Unicode symbols. Click any symbol to copy it to your clipboard.
 - **LaTeX Toolbar** — Select text in any input field to get a floating toolbar for wrapping text in `\textbf{}` or `\textit{}` commands.
 -  ![hippo](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZm4wbm16cmxnem9kOGhpeGs3YXkwemZ6aWFiODhwY291aG1qODBtNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dZFqYvKRrA6OTNBItE/giphy.gif)
