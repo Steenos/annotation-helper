@@ -189,11 +189,23 @@ function fillAnnotationFields(data) {
 // ============================================
 
 function findCellMetadataHeader(popup) {
-  // Find the "Cell Metadata" label div inside the popup
+  // Find the "Cell Metadata" label div inside the popup.
+  // The header may contain extra child elements (e.g. a "— needs value" span)
+  // so we match by checking the first child's text or a startsWith check.
   const divs = popup.querySelectorAll('div');
   for (const div of divs) {
-    if (div.childNodes.length === 1 && div.textContent.trim() === 'Cell Metadata') {
-      return div;
+    const text = div.textContent.trim();
+    // Check that it starts with "Cell Metadata" and is the label div
+    // (not a parent container that also includes input fields).
+    if (text.startsWith('Cell Metadata') && div.querySelector('input') === null) {
+      // Prefer a div whose first direct child text or element says "Cell Metadata"
+      const firstChild = div.childNodes[0];
+      if (firstChild) {
+        const firstText = (firstChild.textContent || '').trim();
+        if (firstText === 'Cell Metadata') {
+          return div;
+        }
+      }
     }
   }
   return null;
