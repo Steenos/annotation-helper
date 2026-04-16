@@ -66,6 +66,13 @@ function showToolbar(inputElement, event) {
   toolbar.appendChild(boldBtn);
   toolbar.appendChild(italicBtn);
 
+  // Prevent mousedown from bubbling so the annotation popup doesn't
+  // detect an "outside click" and close before the click handler runs.
+  toolbar.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+  });
+
   document.body.appendChild(toolbar);
   currentToolbar = toolbar;
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Annotation Helper",
-  "version": "1.01",
+  "version": "1.0.2",
   "description": "Easily search and copy unicode symbols, quickly add LaTeX, assists iwith indexing tables",
   "action": {
     "default_popup": "popup.html",
